@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>YouTube Downloader</title>
+    <style>
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+#container {
+    text-align: center;
+    width: 100%;
+    max-width: 700px;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+#videoUrl {
+    width: 100%;
+    border: none;
+    border-bottom: 2px solid #000;
+    padding: 10px;
+    font-size: 16px;
+    outline: none;
+    text-align: center;
+    box-sizing: border-box;
+    transition: border-bottom-color 0.3s;
+}
+
+#videoUrl:focus {
+    border-bottom-color: #007BFF;
+}
+
+form {
+    margin-top: 20px;
+}
+
+button {
+    width: 30%;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 16px;
+    background-color: #007BFF;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+select {
+    width: 30%;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 16px;
+    border: none;
+    border-bottom: 2px solid #ddd;
+    border-radius: 4px;
+    background-color: transparent;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+#response {
+    margin-top: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+
+#response.error {
+    color: red;
+}
+
+#response.success {
+    color: green;
+}
+
+#spinner {
+    display: none;
+    margin-top: 20px;
+    text-align: center;
+}
+
+.spinner-border {
+    display: inline-block;
+    width: 2rem;
+    height: 2rem;
+    border: 0.25rem solid #f3f3f3;
+    border-top: 0.25rem solid #007BFF;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+#loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}            
+    </style>
+</head>
+<body>
+    <div id="container">
+        <H1>Youtube Video Downloader</H1>
+        <form id="downloadForm">
+            <input type="text" id="videoUrl" placeholder="Enter YouTube URL" required>
+            <select id="downloadType">
+                <option value="webm">VIDEO</option>
+                <option value="mp3">AUDIO</option>
+            </select>
+
+            <div id="folderSelection">
+                <button type="button" id="selectFolderButton">Select Folder</button>
+                <input type="file" id="folderInput" webkitdirectory directory hidden>
+            </div>
+            <div id="selectedFolder" style="margin-top: 10px; font-weight: bold;"></div>
+
+            <button type="submit">Download</button>
+        </form>
+
+        <div id="loading">
+            <div id="spinner" class="spinner-border"></div>
+            <div id="response"></div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById("downloadForm");
+            const responseDiv = document.getElementById("response");
+            const spinner = document.getElementById("spinner");
+            const selectFolderButton = document.getElementById("selectFolderButton");
+            const folderInput = document.getElementById("folderInput");
+            const selectedFolderDisplay = document.getElementById("selectedFolder");
+            let downloadPath = null;
+            let isDirectoryPickerSupported = 'showDirectoryPicker' in window;
+    
+            // Check if the browser supports the Directory Picker API
+            if (isDirectoryPickerSupported) {
+                selectFolderButton.addEventListener("click", async () => {
+                    try {
+                        const directory = await window.showDirectoryPicker();
+                        downloadPath = directory;
+                        selectedFolderDisplay.textContent = directory.name;
+                    } catch (error) {
+                        if (error.name !== "AbortError") {
+                            console.error("Error selecting directory:", error);
+                            responseDiv.textContent = "Failed to select a directory.";
+                        }
+                    }
+                });
+            } else {
+                selectFolderButton.textContent = "Select Folder";
+                selectFolderButton.addEventListener('click', () => {
+                    folderInput.click();
+                });
+    
+                // Handle folder selection for browsers without directory picker support
+                folderInput.addEventListener('change', () => {
+                    if (folderInput.files.length > 0) {
+                        const folderPath = folderInput.files[0]?.webkitRelativePath || '';
+                        if (folderPath) {
+                            const path = folderPath.substring(0, folderPath.indexOf('/'));
+                            downloadPath = path;
+                            selectedFolderDisplay.textContent = path || "Empty folder selected";
+                        } else {
+                            downloadPath = folderInput.files[0].webkitRelativePath ? folderInput.files[0].webkitRelativePath : "Empty folder selected";
+                            selectedFolderDisplay.textContent = downloadPath || "Empty folder selected";
+                        }
+                    } else {
+
+                        console.log(folderInput);
+                        // If no folder or file is selected, use the default browser download path
+                        downloadPath = "~/Downloads";
+                        selectedFolderDisplay.textContent = downloadPath;
+                    }
+                });
+            }
+    
+            form.addEventListener("submit", async (event) => {
+                event.preventDefault();
+    
+                const videoUrl = document.getElementById("videoUrl").value.trim();
+                const downloadType = document.getElementById("downloadType").value;
+    
+                responseDiv.textContent = "";
+                responseDiv.className = "";
+                spinner.style.display = "block";
+    
+                if (!videoUrl && !downloadPath) {
+                    spinner.style.display = "none";
+                    responseDiv.textContent = "Please enter a valid YouTube URL and select a download folder.";
+                    return;
+                }
+                else if(!downloadPath){
+                        // If no folder or file is selected, use the default browser download path
+                    downloadPath = "~/Downloads";
+                    selectedFolderDisplay.textContent = downloadPath;                    
+                }
+    
+                let pathToSend = typeof downloadPath === 'object' ? downloadPath.name : downloadPath;
+    
+                try {
+                    const response = await fetch("/download", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ videoUrl, downloadType, downloadPath: pathToSend }),
+                    });
+                    
+    
+                    const result = await response.json();
+    
+                    spinner.style.display = "none";
+                    if (response.ok) {
+                        responseDiv.textContent = result.message;
+                        responseDiv.className = "success";
+                    } else {
+                        responseDiv.textContent = result.message || "An error occurred.";
+                        responseDiv.className = "error";
+                    }
+                } catch (error) {
+                    spinner.style.display = "none";
+                    responseDiv.textContent = "Failed to process the request. Please try again.";
+                    responseDiv.className = "error";
+                }
+            });
+        });
+    </script>
+    
+    
+</body>
+</html>
