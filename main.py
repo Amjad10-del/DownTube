@@ -10,6 +10,10 @@ from pathlib import Path
 
 app = Flask(__name__, static_folder="./FrontEnd", static_url_path="")
 
+# Configure base download directory (absolute path)
+DOWNLOADS_DIR = Path.home() / "DownTube/Downloads"  # Creates in user's home folder
+DOWNLOADS_DIR.mkdir(exist_ok=True)  # Ensure directory exists
+
 # SSL Configuration
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 ssl._create_default_https_context = lambda: ssl_context
@@ -22,18 +26,6 @@ logging.basicConfig(
     handlers=[logging.FileHandler('app.log'), logging.StreamHandler()]
 )
 
-COOKIES_PATH = Path("cookies.txt")
-
-def human_like_delay(min_sec=1, max_sec=3):
-    time.sleep(random.uniform(min_sec, max_sec))
-
-def validate_cookies():
-    if COOKIES_PATH.exists():
-        logging.info("Valid cookies file found")
-        return True
-    logging.warning("No cookies.txt file found - bot detection likely")
-    return False
-
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, "FrontPage.html")
@@ -41,22 +33,20 @@ def index():
 @app.route("/download", methods=["POST"])
 def download_video():
     try:
-        human_like_delay(0.5, 1.5)
         data = request.get_json()
-        
-        # Extract parameters
         video_url = data.get("videoUrl")
         download_type = data.get("downloadType")
-        download_path = data.get("downloadPath", "downloads")
-
+        
+        # Use fixed download directory
+        download_path = DOWNLOADS_DIR
+        
+        # Validate inputs
         if not all([video_url, download_type]):
             return jsonify({"message": "Missing required fields"}), 400
 
-        os.makedirs(download_path, exist_ok=True)
-
-        # Configure download options with cookies
         ydl_opts = {
-            "outtmpl": os.path.join(download_path, "%(title)s.%(ext)s"),
+            # Absolute path for output template
+            "outtmpl": str(download_path / "%(title)s.%(ext)s"),
             "nocheckcertificate": False,
             "ignoreerrors": False,
             "http_headers": {
@@ -64,12 +54,9 @@ def download_video():
                 "Accept-Language": "en-US,en;q=0.9",
                 "Referer": "https://www.youtube.com/"
             },
-            "cookiefile": str(COOKIES_PATH) if validate_cookies() else None,
             "ratelimit": 1_500_000,
-            "retries": 5,
-            "sleep_interval": random.randint(5, 15),
-            "throttled_duration": 45,
-            "verbose": False
+            "retries": 3,
+            "verbose": True
         }
 
         # Format configuration
@@ -88,29 +75,34 @@ def download_video():
             return jsonify({"message": "Invalid download type"}), 400
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            human_like_delay(1, 2)
+            # Add human-like delay
+            time.sleep(random.uniform(1, 2))
+            
             info = ydl.extract_info(video_url, download=True)
             
-            # Enhanced validation
-            if not info or 'title' not in info:
-                logging.error(f"Invalid video info: {info}")
-                raise yt_dlp.utils.DownloadError("Invalid video response")
-
-            logging.info(f"Downloaded: {info['title']}")
+            if not info:
+                raise yt_dlp.utils.DownloadError("No video information found")
+            
+            # Get actual saved file path
+            downloaded_file = ydl.prepare_filename(info)
+            downloaded_file = Path(downloaded_file).resolve()  # Get absolute path
+            
+            logging.info(f"File saved to: {downloaded_file}")
 
         return jsonify({
             "success": True,
-            "message": "Download completed",
-            "title": info['title'][:50] + "..." if len(info['title']) > 50 else info['title']
+            "message": "Download completed!",
+            "path": str(downloaded_file),
+            "file": os.path.basename(downloaded_file)
         })
 
     except yt_dlp.utils.DownloadError as e:
         logging.error(f"Download failed: {str(e)}")
-        return jsonify({"message": f"YouTube error: {str(e)}"}), 400
+        return jsonify({"message": f"Download error: {str(e)}"}), 400
         
     except Exception as e:
         logging.exception("Critical error:")
         return jsonify({"message": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
