@@ -17,8 +17,8 @@ ssl_context = ssl.create_default_context(cafile=certifi.where())
 ssl._create_default_https_context = lambda: ssl_context
 os.environ['SSL_CERT_FILE'] = certifi.where()
 
-# Path Configuration
-DOWNLOADS_DIR = Path(os.getenv('DOWNLOAD_DIR', Path.home() / "DownTube_Downloads"))
+# Default downloads directory (system's Downloads folder)
+DOWNLOADS_DIR = Path.home() / "Downloads"
 DOWNLOADS_DIR.mkdir(exist_ok=True, parents=True)
 
 # Logging Setup
@@ -32,16 +32,6 @@ logging.basicConfig(
 def human_like_delay(min_sec=1, max_sec=3):
     """Simulate human interaction delays"""
     time.sleep(random.uniform(min_sec, max_sec))
-
-def validate_path(user_path):
-    """Sanitize and validate download path"""
-    try:
-        path = Path(user_path).resolve() if user_path.strip() else DOWNLOADS_DIR
-        path.mkdir(exist_ok=True, parents=True)
-        return path
-    except Exception as e:
-        logging.error(f"Invalid path {user_path}: {str(e)}")
-        return DOWNLOADS_DIR
 
 # ========== Routes ==========
 @app.route("/")
@@ -58,14 +48,12 @@ def handle_download():
         if not all([data.get("videoUrl"), data.get("downloadType")]):
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Configure paths
-        download_path = validate_path(data.get("downloadPath", ""))
         video_url = data["videoUrl"]
         download_type = data["downloadType"]
 
         # YouTube DL Configuration
         ydl_opts = {
-            "outtmpl": str(download_path / "%(title)s.%(ext)s"),
+            "outtmpl": str(DOWNLOADS_DIR / "%(title)s.%(ext)s"),
             "nocheckcertificate": False,
             "ignoreerrors": False,
             "http_headers": {
@@ -83,6 +71,9 @@ def handle_download():
         cookies_file = Path("cookies.txt")
         if cookies_file.exists():
             ydl_opts["cookiefile"] = str(cookies_file)
+            logging.info("Using cookies for authentication")
+        else:
+            logging.warning("No cookies.txt found - some videos might require login")
 
         # Format configuration
         if download_type == "mp3":
