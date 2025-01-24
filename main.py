@@ -2,10 +2,16 @@ from flask import Flask, request, jsonify, send_from_directory
 import yt_dlp
 import os
 import logging
+import certifi
+import ssl
 
 app = Flask(__name__,static_folder="./FrontEnd", static_url_path="")
 
+
 logging.basicConfig(level=logging.DEBUG)
+# Force SSL certificate verification
+ssl._create_default_https_context = ssl.create_default_context(cafile=certifi.where())
+os.environ['SSL_CERT_FILE'] = certifi.where()
 
 @app.route("/")
 def index():
