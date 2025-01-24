@@ -1,3 +1,4 @@
+# main.py
 from flask import Flask, request, jsonify, send_from_directory
 import yt_dlp
 import os
@@ -8,44 +9,62 @@ import random
 import time
 from pathlib import Path
 
-app = Flask(__name__, static_folder="./FrontEnd", static_url_path="")
+app = Flask(__name__, static_folder="./FrontEnd", static_url_path="/")
 
-# Configure base download directory (absolute path)
-DOWNLOADS_DIR = Path.home() / "DownTube/Downloads"  # Creates in user's home folder
-DOWNLOADS_DIR.mkdir(exist_ok=True)  # Ensure directory exists
-
-# SSL Configuration
+# ========== Configuration Section ==========
+# SSL Setup
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 ssl._create_default_https_context = lambda: ssl_context
 os.environ['SSL_CERT_FILE'] = certifi.where()
 
-# Configure logging
+# Path Configuration
+DOWNLOADS_DIR = Path(os.getenv('DOWNLOAD_DIR', Path.home() / "DownTube_Downloads"))
+DOWNLOADS_DIR.mkdir(exist_ok=True, parents=True)
+
+# Logging Setup
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[logging.FileHandler('app.log'), logging.StreamHandler()]
 )
 
+# ========== Helper Functions ==========
+def human_like_delay(min_sec=1, max_sec=3):
+    """Simulate human interaction delays"""
+    time.sleep(random.uniform(min_sec, max_sec))
+
+def validate_path(user_path):
+    """Sanitize and validate download path"""
+    try:
+        path = Path(user_path).resolve() if user_path.strip() else DOWNLOADS_DIR
+        path.mkdir(exist_ok=True, parents=True)
+        return path
+    except Exception as e:
+        logging.error(f"Invalid path {user_path}: {str(e)}")
+        return DOWNLOADS_DIR
+
+# ========== Routes ==========
 @app.route("/")
-def index():
+def serve_frontend():
     return send_from_directory(app.static_folder, "FrontPage.html")
 
 @app.route("/download", methods=["POST"])
-def download_video():
+def handle_download():
     try:
+        human_like_delay(0.5, 1.5)
         data = request.get_json()
-        video_url = data.get("videoUrl")
-        download_type = data.get("downloadType")
         
-        # Use fixed download directory
-        download_path = DOWNLOADS_DIR
-        
-        # Validate inputs
-        if not all([video_url, download_type]):
-            return jsonify({"message": "Missing required fields"}), 400
+        # Validate input
+        if not all([data.get("videoUrl"), data.get("downloadType")]):
+            return jsonify({"error": "Missing required fields"}), 400
 
+        # Configure paths
+        download_path = validate_path(data.get("downloadPath", ""))
+        video_url = data["videoUrl"]
+        download_type = data["downloadType"]
+
+        # YouTube DL Configuration
         ydl_opts = {
-            # Absolute path for output template
             "outtmpl": str(download_path / "%(title)s.%(ext)s"),
             "nocheckcertificate": False,
             "ignoreerrors": False,
@@ -56,8 +75,14 @@ def download_video():
             },
             "ratelimit": 1_500_000,
             "retries": 3,
-            "verbose": True
+            "sleep_interval": random.randint(5, 15),
+            "verbose": False
         }
+
+        # Add cookies if available
+        cookies_file = Path("cookies.txt")
+        if cookies_file.exists():
+            ydl_opts["cookiefile"] = str(cookies_file)
 
         # Format configuration
         if download_type == "mp3":
@@ -72,37 +97,32 @@ def download_video():
         elif download_type == "webm":
             ydl_opts["format"] = "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]/best"
         else:
-            return jsonify({"message": "Invalid download type"}), 400
+            return jsonify({"error": "Invalid download type"}), 400
 
+        # Execute download
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Add human-like delay
-            time.sleep(random.uniform(1, 2))
-            
+            human_like_delay(1, 2)
             info = ydl.extract_info(video_url, download=True)
             
-            if not info:
-                raise yt_dlp.utils.DownloadError("No video information found")
-            
-            # Get actual saved file path
-            downloaded_file = ydl.prepare_filename(info)
-            downloaded_file = Path(downloaded_file).resolve()  # Get absolute path
-            
-            logging.info(f"File saved to: {downloaded_file}")
+            if not info or 'title' not in info:
+                raise yt_dlp.utils.DownloadError("Invalid video response")
+
+            downloaded_file = Path(ydl.prepare_filename(info)).resolve()
+            logging.info(f"Successfully downloaded to: {downloaded_file}")
 
         return jsonify({
             "success": True,
-            "message": "Download completed!",
             "path": str(downloaded_file),
-            "file": os.path.basename(downloaded_file)
+            "filename": downloaded_file.name
         })
 
     except yt_dlp.utils.DownloadError as e:
         logging.error(f"Download failed: {str(e)}")
-        return jsonify({"message": f"Download error: {str(e)}"}), 400
+        return jsonify({"error": str(e)}), 400
         
     except Exception as e:
-        logging.exception("Critical error:")
-        return jsonify({"message": "Internal server error"}), 500
+        logging.exception("Server error:")
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=False)
