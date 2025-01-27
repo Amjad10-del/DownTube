@@ -57,6 +57,8 @@ def handle_download():
                 "Referer": "https://www.youtube.com/",
             },
             "retries": 3,
+            # New critical configuration:
+            "ssl_ca_certificates": certifi.where(),  # <-- Explicit CA bundle
         }
 
         if download_type == "mp3":
