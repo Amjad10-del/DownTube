@@ -25,10 +25,6 @@ logging.basicConfig(
     ]
 )
 
-ssl_context = ssl.create_default_context(cafile=certifi.where())
-ssl._create_default_https_context = lambda: ssl_context
-os.environ['SSL_CERT_FILE'] = certifi.where()
-
 COOKIES_FILE = Path("cookies.txt")
 
 def human_like_delay():
