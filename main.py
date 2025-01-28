@@ -121,7 +121,10 @@ def handle_download():
 
             final_file = Path(info['requested_downloads'][0]['filepath']).resolve()
 
-            if download_type == "mp3" and final_file.suffix != ".mp3":
+            # Force correct extension based on download type
+            if download_type == "webm":
+                final_file = final_file.with_suffix(".webm")
+            elif download_type == "mp3":
                 final_file = final_file.with_suffix(".mp3")
 
             if not final_file.exists():
