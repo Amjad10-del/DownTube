@@ -96,7 +96,14 @@ def handle_download():
                 "keepvideo": False,
             })
         elif download_type == "webm":
-            ydl_opts["format"] = "bestvideo+bestaudio/best"
+                ydl_opts.update({
+                "format": "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]/best",
+                "merge_output_format": "webm",
+                "postprocessors": [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'webm'
+                }]
+        })
         else:
             return jsonify({"error": "Invalid download type"}), 400
 
