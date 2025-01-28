@@ -1,5 +1,8 @@
 import os
 import certifi
+import certifi
+print(f"[DEBUG] Certifi CA bundle path: {certifi.where()}")
+print(f"[DEBUG] Files at certifi path: {os.listdir(os.path.dirname(certifi.where()))}")
 
 # MUST BE AT VERY TOP - BEFORE ANY IMPORTS
 os.environ['SSL_CERT_FILE'] = certifi.where()
