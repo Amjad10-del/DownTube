@@ -1,6 +1,7 @@
 import os
 import certifi
-import certifi
+import logging
+
 print(f"[DEBUG] Certifi CA bundle path: {certifi.where()}")
 print(f"[DEBUG] Files at certifi path: {os.listdir(os.path.dirname(certifi.where()))}")
 
@@ -10,7 +11,6 @@ os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 
 from flask import Flask, request, jsonify, Response
 import yt_dlp
-import logging
 import ssl
 import random
 import time
@@ -28,6 +28,9 @@ app = Flask(__name__, static_folder="./FrontEnd", static_url_path="/")
 os.environ['SSL_CERT_FILE'] = certifi.where()
 os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 
+# Log the paths to ensure they are set correctly
+logging.info(f"SSL_CERT_FILE: {os.environ['SSL_CERT_FILE']}")
+logging.info(f"REQUESTS_CA_BUNDLE: {os.environ['REQUESTS_CA_BUNDLE']}")
 
 # Configure logging with UTF-8 encoding
 logging.basicConfig(
@@ -64,7 +67,7 @@ def handle_download():
 
         ydl_opts = {
             "outtmpl": os.path.join("~/download", "%(title)s.%(ext)s"),
-            "nocheckcertificate": True,
+            "nocheckcertificate": False,
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36",
                 "Accept-Language": "en-US,en;q=0.9",
@@ -72,7 +75,8 @@ def handle_download():
             },
             "retries": 5,
             "socket_timeout": 30,
-            "force_ipv4": True,            
+            "force_ipv4": True,        
+            "compat_opts": ["no-certifi"],    
             # New critical configuration:
             "ssl_ca_certificates": certifi.where(),  # <-- Explicit CA bundle
         }
@@ -120,7 +124,7 @@ def handle_download():
             
             # Set safe filename with URL encoding
             response.headers["Content-Disposition"] = (
-                f"attachment; "
+                f"attachment; filename*=UTF-8''{quote(final_file.name)}"
             )
             
             response.headers["Content-Length"] = os.path.getsize(final_file)
