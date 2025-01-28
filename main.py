@@ -9,17 +9,17 @@ print(f"[DEBUG] Files at certifi path: {os.listdir(os.path.dirname(certifi.where
 os.environ['SSL_CERT_FILE'] = certifi.where()
 os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 
-from flask import Flask, request, jsonify, Response, send_file
+from flask import Flask, request, jsonify
+# Response, send_file
 import yt_dlp
-import ssl
+# import ssl
 import random
 import time
-import tempfile
-import shutil
-import mimetypes
-import re
+# import tempfile
+# import shutil
+# import mimetypes
+# import re
 from pathlib import Path
-from urllib.parse import quote
 
 app = Flask(__name__, static_folder="./FrontEnd", static_url_path="/")
 
@@ -47,6 +47,7 @@ COOKIES_FILE = Path("cookies.txt")
 def human_like_delay():
     time.sleep(random.uniform(3, 10))
 
+
 @app.route("/")
 def serve_frontend():
     return app.send_static_file("FrontPage.html")
@@ -64,9 +65,8 @@ def handle_download():
         download_type = data["downloadType"]
         logging.info(f"Processing download for URL: {video_url}, Type: {download_type}")
 
-
         ydl_opts = {
-            "outtmpl": os.path.join("~/download", "%(title)s.%(ext)s"),
+            # "outtmpl": os.path.join(os.path.expanduser("~"), "download", "%(title)s.%(ext)s"),
             "nocheckcertificate": False,
             "cookiefile": "cookies.txt" if Path("cookies.txt").exists() else None,
             "http_headers": {
@@ -79,11 +79,13 @@ def handle_download():
             },
             "retries": 5,
             "socket_timeout": 30,
-            "force_ipv4": True,        
-            "compat_opts": ["no-certifi"],    
-            # New critical configuration:
-            "ssl_ca_certificates": certifi.where(),  # <-- Explicit CA bundle
+            "force_ipv4": True,
+            "compat_opts": ["no-certifi"],
+            "ssl_ca_certificates": certifi.where(),
         }
+
+        # Default path for download (before "Save As")
+        default_path = os.path.join(os.path.expanduser("~"), "test_user", "%(title)s")
 
         if download_type == "mp3":
             ydl_opts.update({
@@ -93,18 +95,16 @@ def handle_download():
                     "preferredcodec": "mp3",
                     "preferredquality": "192",
                 }],
-                "keepvideo": False,
-            })              
+                "outtmpl": default_path + ".mp3"
+            })
         elif download_type == "webm":
             ydl_opts.update({
-                # Prioritize existing WEBM formats or allow conversion
                 "format": "bestvideo+bestaudio/best",
-                # Explicitly set output extension
-                "outtmpl": os.path.join("~/download", "%(title)s.webm"),  
-                "postprocessors": [{
-                    'key': 'FFmpegVideoConvertor',
-                    'preferedformat': 'webm'  # Correct spelling (single 'e')
-                }]
+                # "postprocessors": [{
+                #     'key': 'FFmpegVideoConvertor',
+                #     'preferedformat': 'webm'
+                # }],
+                "outtmpl": default_path + ".webm"
             })
         else:
             return jsonify({"error": "Invalid download type"}), 400
@@ -114,51 +114,62 @@ def handle_download():
             logging.info("Using cookies.txt for authentication")
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=True)
-            if not info:
-                raise yt_dlp.utils.DownloadError("No video information found.")
+            ydl.download([video_url])
+        return jsonify({"message": f"Download completed successfully. File saved to {os.path.expanduser('~')}/download"}), 200
 
-            if 'requested_downloads' not in info or not info['requested_downloads']:
-                raise yt_dlp.utils.DownloadError("Downloaded file information missing.")
-
-            final_file = Path(info['requested_downloads'][0]['filepath']).resolve()
-
-
-            if final_file.exists():
-                try:
-                    # Use Flask's `send_file` for sending files with correct MIME type
-                    return send_file(
-                        final_file,
-                        as_attachment=True,
-                        mimetype=mimetypes.guess_type(str(final_file))[0] or "application/octet-stream",
-                        download_name=final_file.name,
-                    )
-                except Exception as e:
-                    logging.exception("Failed to send the file.")
-                    return jsonify({"error": "Failed to prepare the file for download."}), 500            
-
-            # if download_type == "mp3" and final_file.suffix != ".mp3":
-            #     final_file = final_file.with_suffix(".mp3")
-
-            if not final_file.exists():
-                logging.error(f"File not found: {final_file}")
-                return jsonify({"error": "Processed file not found"}), 500
-
-        mime_type, _ = mimetypes.guess_type(str(final_file))
+    except Exception as e:
+        logging.error(f"Error occurred: {e}")
+        return jsonify({"error": str(e)}), 500        
 
         
 
-        with open(final_file, "rb") as file:
-            response = Response(file.read(), mimetype=mime_type)
+        #     info = ydl.extract_info(video_url, download=True)
+        #     if not info:
+        #         raise yt_dlp.utils.DownloadError("No video information found.")
+
+        #     if 'requested_downloads' not in info or not info['requested_downloads']:
+        #         raise yt_dlp.utils.DownloadError("Downloaded file information missing.")
+
+        #     final_file = Path(info['requested_downloads'][0]['filepath']).resolve()
+
+
+        #     if final_file.exists():
+        #         try:
+        #             # Use Flask's `send_file` for sending files with correct MIME type
+        #             return send_file(
+        #                 final_file,
+        #                 as_attachment=True,
+        #                 mimetype=mimetypes.guess_type(str(final_file))[0] or "application/octet-stream",
+        #                 download_name=final_file.name,
+        #             )
+        #         except Exception as e:
+        #             logging.exception("Failed to send the file.")
+        #             return jsonify({"error": "Failed to prepare the file for download."}), 500            
+
+        #     # if download_type == "mp3" and final_file.suffix != ".mp3":
+        #     #     final_file = final_file.with_suffix(".mp3")
+
+        #     if not final_file.exists():
+        #         logging.error(f"File not found: {final_file}")
+        #         return jsonify({"error": "Processed file not found"}), 500
+
+        # mime_type, _ = mimetypes.guess_type(str(final_file))
+
+        
+
+        # with open(final_file, "rb") as file:
+        #     response = Response(file.read(), mimetype=mime_type)
             
-            # Set safe filename with URL encoding
-            response.headers["Content-Disposition"] = (
-                f"attachment; filename*=UTF-8''{quote(final_file.name)}"
-            )
+        #     # Set safe filename with URL encoding
+        #     response.headers["Content-Disposition"] = (
+        #         f"attachment; filename*=UTF-8''{quote(final_file.name)}"
+        #     )
             
-            response.headers["Content-Length"] = os.path.getsize(final_file)
-            logging.info(f"Prepared file for download")
-            return response
+        #     response.headers["Content-Length"] = os.path.getsize(final_file)
+        #     logging.info(f"Prepared file for download")
+        #     return response
+
+
 
     except yt_dlp.utils.DownloadError as e:
         logging.error(f"Download error: {e}")
