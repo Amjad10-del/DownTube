@@ -46,7 +46,7 @@ logging.basicConfig(
 COOKIES_FILE = Path("cookies.txt")
 
 def human_like_delay():
-    time.sleep(random.uniform(3, 10))
+    time.sleep(random.uniform(15, 30))
 
 def sanitize_filename(filename: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", filename)
