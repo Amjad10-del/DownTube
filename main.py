@@ -9,7 +9,7 @@ print(f"[DEBUG] Files at certifi path: {os.listdir(os.path.dirname(certifi.where
 os.environ['SSL_CERT_FILE'] = certifi.where()
 os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, send_file
 import yt_dlp
 import ssl
 import random
@@ -121,14 +121,30 @@ def handle_download():
 
             final_file = Path(info['requested_downloads'][0]['filepath']).resolve()
 
-            if download_type == "mp3" and final_file.suffix != ".mp3":
-                final_file = final_file.with_suffix(".mp3")
+
+            if final_file.exists():
+                try:
+                    # Use Flask's `send_file` for sending files with correct MIME type
+                    return send_file(
+                        final_file,
+                        as_attachment=True,
+                        mimetype=mimetypes.guess_type(str(final_file))[0] or "application/octet-stream",
+                        download_name=final_file.name,
+                    )
+                except Exception as e:
+                    logging.exception("Failed to send the file.")
+                    return jsonify({"error": "Failed to prepare the file for download."}), 500            
+
+            # if download_type == "mp3" and final_file.suffix != ".mp3":
+            #     final_file = final_file.with_suffix(".mp3")
 
             if not final_file.exists():
                 logging.error(f"File not found: {final_file}")
                 return jsonify({"error": "Processed file not found"}), 500
 
         mime_type, _ = mimetypes.guess_type(str(final_file))
+
+        
 
         with open(final_file, "rb") as file:
             response = Response(file.read(), mimetype=mime_type)
