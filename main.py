@@ -85,7 +85,7 @@ def handle_download():
         }
 
         # Default path for download (before "Save As")
-        default_path = os.path.join(os.path.expanduser("~"), "test_user", "%(title)s")
+        default_path = os.path.join(os.path.expanduser("~"), "test_files", "%(title)s")
 
         if download_type == "mp3":
             ydl_opts.update({
