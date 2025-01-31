@@ -12,7 +12,6 @@ import atexit
 from pathlib import Path
 from flask import Flask, request, jsonify, Response, send_file
 import yt_dlp
-import browser_cookie3
 
 # --------------------------
 # Initial Configuration
