@@ -51,24 +51,7 @@ def sanitize_filename(filename: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", filename)[:200]
 
 def get_yt_cookies():
-    """Load cookies from multiple sources with validation"""
-    try:
-        # Try Chrome first
-        cj = browser_cookie3.chrome(domain_name='.youtube.com')
-        if any(c.name == 'LOGIN_INFO' for c in cj):
-            return cj
-    except Exception as e:
-        logging.warning(f"Chrome cookie load failed: {str(e)}")
-
-    try:
-        # Try Firefox as fallback
-        cj = browser_cookie3.firefox(domain_name='.youtube.com')
-        if any(c.name == 'LOGIN_INFO' for c in cj):
-            return cj
-    except Exception as e:
-        logging.warning(f"Firefox cookie load failed: {str(e)}")
-
-    # Fallback to cookies.txt
+    """Load cookies from cookies.txt file"""
     cookie_file = Path("cookies.txt")
     if cookie_file.exists():
         cj = MozillaCookieJar(str(cookie_file))
