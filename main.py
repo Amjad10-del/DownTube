@@ -12,6 +12,7 @@ import atexit
 from pathlib import Path
 from flask import Flask, request, jsonify, Response, send_file
 import yt_dlp
+import browser_cookie3
 
 # --------------------------
 # Initial Configuration
@@ -36,11 +37,12 @@ logging.basicConfig(
 TEMP_DIR = Path(tempfile.gettempdir()) / "ytdl_downloads"
 TEMP_DIR.mkdir(exist_ok=True)
 
+
 # --------------------------
 # Utility Functions
 # --------------------------
 def human_like_delay():
-    time.sleep(random.uniform(0.5, 1.5))
+    time.sleep(random.uniform(15, 20))
 
 def sanitize_filename(filename: str) -> str:
     cleaned = re.sub(r'[\\/*?:"<>|]', "", filename)
