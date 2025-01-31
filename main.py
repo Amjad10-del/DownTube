@@ -7,6 +7,7 @@ import tempfile
 import shutil
 import re
 import atexit
+import browser_cookie3
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file
 import yt_dlp
