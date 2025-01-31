@@ -7,9 +7,11 @@ import tempfile
 import shutil
 import re
 import atexit
+import browser_cookie3
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file
 import yt_dlp
+from http.cookiejar import MozillaCookieJar
 
 # --------------------------
 # Initial Configuration
@@ -69,7 +71,7 @@ def get_yt_cookies():
     # Fallback to cookies.txt
     cookie_file = Path("cookies.txt")
     if cookie_file.exists():
-        cj = browser_cookie3.MozillaCookieJar(str(cookie_file))
+        cj = MozillaCookieJar(str(cookie_file))
         cj.load()
         if any(c.name == 'LOGIN_INFO' for c in cj):
             return cj
