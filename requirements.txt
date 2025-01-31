@@ -4,3 +4,4 @@ gunicorn==21.2.0
 gevent==23.9.1
 certifi==2024.2.2
 pyOpenSSL==24.1.0
+browser-cookie3==0.12.0
