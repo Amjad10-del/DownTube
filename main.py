@@ -32,16 +32,22 @@ logging.basicConfig(
 # Constants
 TEMP_DIR = Path(tempfile.gettempdir()) / "ytdl_downloads"
 TEMP_DIR.mkdir(exist_ok=True)
-COOKIES_PATH = "cookies.txt"  # Provide your YouTube cookies here
+COOKIES_PATH = "cookies.txt"
 
 # --------------------------
 # Utility Functions
 # --------------------------
 def human_like_delay():
-    time.sleep(random.uniform(5, 10))
+    time.sleep(random.uniform(2, 5))
 
 def sanitize_filename(filename: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", filename)[:200]
+
+def validate_ffmpeg():
+    ffmpeg_path = shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        raise RuntimeError("FFmpeg not found in PATH. Install FFmpeg and ensure it's available.")
+    return ffmpeg_path
 
 # --------------------------
 # Cleanup System
@@ -70,11 +76,12 @@ def handle_download():
         human_like_delay()
         data = request.get_json()
         
-        if not data or not data.get("videoUrl"):
+        if not data or not all([data.get("videoUrl"), data.get("downloadType")]):
             return jsonify({"error": "Missing required fields"}), 400
         
         video_url = data["videoUrl"]
-        logging.info(f"New download request: {video_url}")
+        download_type = data["downloadType"]
+        logging.info(f"New download request: {video_url} [{download_type}]")
         
         base_ydl_opts = {
             "noplaylist": True,
@@ -87,9 +94,16 @@ def handle_download():
             "cookiefile": COOKIES_PATH if os.path.exists(COOKIES_PATH) else None,
             "cookies_from_browser": ("chrome",) if not os.path.exists(COOKIES_PATH) else None,
             "ssl_ca_certificates": certifi.where(),
+            "format_sort": ["res:1080", "ext:mp4"],  # Prefer 1080p MP4
+            "merge_output_format": "mp4",
         }
         
-        return handle_best_download(video_url, base_ydl_opts)
+        if download_type == "video":
+            return handle_video_download(video_url, base_ydl_opts)
+        elif download_type == "mp3":
+            return handle_audio_download(video_url, base_ydl_opts)
+        else:
+            return jsonify({"error": "Invalid download type"}), 400
 
     except yt_dlp.utils.DownloadError as e:
         logging.error(f"Download error: {str(e)}")
@@ -98,24 +112,97 @@ def handle_download():
         logging.exception("Critical server error")
         return jsonify({"error": "Internal server error"}), 500
 
-def handle_best_download(url, base_opts):
+def handle_video_download(url, base_opts):
+    """Handle video downloads with fallback formats"""
+    ffmpeg_path = validate_ffmpeg()
+    
     ydl_opts = {
         **base_opts,
-        "format": "bestvideo+bestaudio/best",
-        "merge_output_format": "mp4",
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "postprocessors": [{
+            "key": "FFmpegVideoConvertor",
+            "preferedformat": "mp4"
+        }],
+        "ffmpeg_location": ffmpeg_path
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        original_path = Path(ydl.prepare_filename(info))
-        temp_path = TEMP_DIR / f"{sanitize_filename(info.get('title', 'video'))}.mp4"
-        shutil.move(original_path, temp_path)
-        response = send_file(temp_path, as_attachment=True, mimetype="video/mp4")
-        response.call_on_close(lambda: temp_path.unlink(missing_ok=True))
-        return response
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            original_path = Path(ydl.prepare_filename(info))
+            
+            # Handle format variations
+            if not original_path.exists():
+                original_path = original_path.with_suffix('.mp4')
+                
+            temp_path = TEMP_DIR / f"{sanitize_filename(info.get('title', 'video'))}{original_path.suffix}"
+            shutil.move(original_path, temp_path)
+            
+            response = send_file(
+                temp_path,
+                as_attachment=True,
+                mimetype="video/mp4",
+                download_name=f"{sanitize_filename(info.get('title', 'video'))}{temp_path.suffix}"
+            )
+            response.call_on_close(lambda: temp_path.unlink(missing_ok=True))
+            return response
+            
+    except yt_dlp.utils.DownloadError as e:
+        if "Requested format is not available" in str(e):
+            # Fallback to best available format
+            ydl_opts["format"] = "best"
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                original_path = Path(ydl.prepare_filename(info))
+                # Rest of handling remains same
+        else:
+            raise
+
+def handle_audio_download(url, base_opts):
+    """Handle audio downloads with FFmpeg validation"""
+    ffmpeg_path = validate_ffmpeg()
+    temp_path = TEMP_DIR / "temp_audio.mp3"
+    
+    ydl_opts = {
+        **base_opts,
+        "format": "bestaudio/best",
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
+        "ffmpeg_location": ffmpeg_path,
+        "outtmpl": str(temp_path.with_suffix('')),
+        "keepvideo": False,
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if not temp_path.exists() or temp_path.stat().st_size < 1024:
+                raise ValueError("MP3 conversion failed")
+                
+            response = send_file(
+                temp_path,
+                as_attachment=True,
+                mimetype="audio/mpeg",
+                download_name=f"{sanitize_filename(info.get('title', 'audio'))}.mp3"
+            )
+            response.call_on_close(lambda: temp_path.unlink(missing_ok=True))
+            return response
+            
+    except Exception as e:
+        temp_path.unlink(missing_ok=True)
+        raise
 
 # --------------------------
 # Execution
 # --------------------------
 if __name__ == "__main__":
     TEMP_DIR.mkdir(exist_ok=True, parents=True)
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=False, threaded=True)
+    try:
+        validate_ffmpeg()
+        app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=False, threaded=True)
+    except RuntimeError as e:
+        logging.critical(str(e))
+        exit(1)
