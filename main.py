@@ -88,17 +88,18 @@ def handle_download():
             ydl_opts = {
                 **base_ydl_opts,
                 "format": "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]/best",
-                "download": False  # Don't download, just get metadata
+                # "download": False  # Don't download, just get metadata
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(video_url, download=False)
                 if not info:
                     raise yt_dlp.utils.DownloadError("No video information found")
-
-                stream_url = info.get('url')
+                stream_url = info['formats'][-1]['url'] 
                 if not stream_url:
-                    raise yt_dlp.utils.DownloadError("No direct stream URL found")
+                    raise yt_dlp.utils.DownloadError("NOT direct stream URL found" + stream_url.get('url'))
+
+                print("Stream URL:", stream_url)
 
                 # Prepare streaming headers
                 headers = {"User-Agent": base_ydl_opts["http_headers"]["User-Agent"]}
