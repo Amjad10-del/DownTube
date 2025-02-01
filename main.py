@@ -2,14 +2,6 @@ import os
 import certifi
 import logging
 from http.cookiejar import MozillaCookieJar
-
-print(f"[DEBUG] Certifi CA bundle path: {certifi.where()}")
-print(f"[DEBUG] Files at certifi path: {os.listdir(os.path.dirname(certifi.where()))}")
-
-# MUST BE AT VERY TOP - BEFORE ANY IMPORTS
-os.environ['SSL_CERT_FILE'] = certifi.where()
-os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
-
 from flask import Flask, request, jsonify, Response, send_file
 import yt_dlp
 import ssl
@@ -22,6 +14,11 @@ import re
 import requests
 from pathlib import Path
 from urllib.parse import quote
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 
 app = Flask(__name__, static_folder="./FrontEnd", static_url_path="/")
 
@@ -51,6 +48,28 @@ def human_like_delay():
 def sanitize_filename(filename: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", filename)
 
+def update_cookies():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
+    driver.get("https://www.youtube.com")
+
+    # Add code to log in to YouTube manually if required
+    # For example, you can use driver.find_element to interact with the login form
+
+    time.sleep(10)  # Wait for manual login if needed
+
+    cookies = driver.get_cookies()
+    cj = MozillaCookieJar(COOKIES_FILE)
+    for cookie in cookies:
+        cj.set_cookie(requests.cookies.create_cookie(name=cookie['name'], value=cookie['value'], domain=cookie['domain']))
+    cj.save(ignore_discard=True, ignore_expires=True)
+    driver.quit()
+
 @app.route("/")
 def serve_frontend():
     return app.send_static_file("FrontPage.html")
@@ -67,6 +86,9 @@ def handle_download():
         video_url = data["videoUrl"]
         download_type = data["downloadType"]
         logging.info(f"Processing download for URL: {video_url}, Type: {download_type}")
+
+        # Update cookies before downloading
+        update_cookies()
 
         # Common YDL options
         base_ydl_opts = {
@@ -95,7 +117,7 @@ def handle_download():
                 info = ydl.extract_info(video_url, download=False)
                 if not info:
                     raise yt_dlp.utils.DownloadError("No video information found")
-                stream_url = info['formats'][-1]['url'] 
+                stream_url = info['formats'][-1]['url']
                 if not stream_url:
                     raise yt_dlp.utils.DownloadError("NOT direct stream URL found" + stream_url.get('url'))
 
@@ -123,7 +145,7 @@ def handle_download():
                             yield chunk
 
                 filename = sanitize_filename(info.get('title', 'video')) + ".webm"
-                
+
                 return Response(
                     generate(),
                     headers={
