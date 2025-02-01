@@ -50,7 +50,7 @@ USER_AGENTS = [
 # --------------------------
 def human_like_delay():
     """Simulate a human-like delay."""
-    delay = random.uniform(15, 30)
+    delay = random.uniform(5, 15)
     logging.info(f"Sleeping for {delay:.2f} seconds to mimic human interaction.")
     time.sleep(delay)
 
@@ -147,7 +147,8 @@ def handle_download():
             "ignoreerrors": False,
             "retries": 3,
             "fragment_retries": 3,
-            "skip_unavailable_fragments": False
+            "skip_unavailable_fragments": False,
+            "verbose": True  # Add verbose logging
         }
 
         if download_type == "webm":
@@ -245,7 +246,7 @@ def handle_download():
         error_message = str(e)
         if "Sign in to confirm you’re not a bot" in error_message:
             logging.error(f"Download error: {e}")
-            return jsonify({"error": "Download failed. Please sign in to confirm you’re not a bot and upload the cookies file again."}), 400
+            return jsonify({"error": "Download failed. Please sign in to confirm you’re not a bot and upload the cookies file again. You can also try using a VPN or updating yt-dlp."}), 400
         else:
             logging.error(f"Download error: {e}")
             return jsonify({"error": "Download failed. The video may require authentication or be restricted."}), 400
