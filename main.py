@@ -43,7 +43,7 @@ logging.basicConfig(
     ]
 )
 
-# COOKIES_FILE = Path("cookies.txt")
+COOKIES_FILE = Path("./cookies.txt")
 
 def human_like_delay():
     time.sleep(random.choice([
@@ -118,6 +118,10 @@ def handle_download():
 
                 # Prepare streaming headers
                 headers = {"User-Agent": base_ydl_opts["http_headers"]["User-Agent"]}
+                if COOKIES_FILE.exists():
+                    cj = MozillaCookieJar()
+                    cj.load(str(COOKIES_FILE), ignore_discard=True, ignore_expires=True)
+                    headers.update({"Cookie": "; ".join([f"{c.name}={c.value}" for c in cj])})
 
                 # Forward range headers for resumable downloads
                 if 'Range' in request.headers:
