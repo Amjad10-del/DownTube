@@ -55,8 +55,7 @@ def update_cookies():
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
 
-    # Specify the version of ChromeDriver to use
-    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager(version="114.0.5735.90").install()), options=chrome_options)
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
     driver.get("https://www.youtube.com")
 
     # Add code to log in to YouTube manually if required
@@ -97,6 +96,7 @@ def handle_download():
             "retries": 5,
             "socket_timeout": 30,
             "force_ipv4": True,
+            "skip": ["authcheck"],  # Bypass bot checks
             "compat_opts": ["no-certifi"],
             "ssl_ca_certificates": certifi.where(),
             "http_headers": {
