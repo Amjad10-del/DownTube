@@ -46,7 +46,11 @@ logging.basicConfig(
 COOKIES_FILE = Path("cookies.txt")
 
 def human_like_delay():
-    time.sleep(random.uniform(15, 30))
+    time.sleep(random.choice([
+        random.uniform(1, 3),  # Quick return
+        random.uniform(5, 8),  # Medium wait
+        random.uniform(12, 18) # Long wait
+    ]))
 
 def sanitize_filename(filename: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", filename)
@@ -76,6 +80,7 @@ def handle_download():
             "skip": ["authcheck"],  # Bypass bot checks
             "force_ipv4": True,
             "compat_opts": ["no-certifi"],
+            "http_chunk_size": random.randint(1048576, 10485760),  # Random chunk size
             "ssl_ca_certificates": certifi.where(),
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
