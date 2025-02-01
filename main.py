@@ -242,8 +242,13 @@ def handle_download():
             return jsonify({"error": "Invalid download type"}), 400
 
     except yt_dlp.utils.DownloadError as e:
-        logging.error(f"Download error: {e}")
-        return jsonify({"error": "Download failed. The video may require authentication or be restricted."}), 400
+        error_message = str(e)
+        if "Sign in to confirm you’re not a bot" in error_message:
+            logging.error(f"Download error: {e}")
+            return jsonify({"error": "Download failed. Please sign in to confirm you’re not a bot and upload the cookies file again."}), 400
+        else:
+            logging.error(f"Download error: {e}")
+            return jsonify({"error": "Download failed. The video may require authentication or be restricted."}), 400
     except requests.RequestException as e:
         logging.error(f"Streaming error: {e}")
         return jsonify({"error": "Streaming failed. Check network connection."}), 500
