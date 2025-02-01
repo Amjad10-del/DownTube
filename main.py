@@ -50,7 +50,7 @@ USER_AGENTS = [
 # --------------------------
 def human_like_delay():
     """Simulate a human-like delay."""
-    delay = random.uniform(5, 15)
+    delay = random.uniform(15, 30)
     logging.info(f"Sleeping for {delay:.2f} seconds to mimic human interaction.")
     time.sleep(delay)
 
