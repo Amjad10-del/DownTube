@@ -47,9 +47,9 @@ COOKIES_FILE = Path("cookies.txt")
 
 def human_like_delay():
     time.sleep(random.choice([
-        random.uniform(1, 3),  # Quick return
-        random.uniform(5, 8),  # Medium wait
-        random.uniform(12, 18) # Long wait
+        random.uniform(10, 30),  # Quick return
+        random.uniform(5, 25),  # Medium wait
+        random.uniform(25 ,50) # Long wait
     ]))
 
 def sanitize_filename(filename: str) -> str:
