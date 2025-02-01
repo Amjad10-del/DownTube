@@ -144,7 +144,7 @@ def handle_video_download(url, base_opts):
     """Handle video downloads."""
     ydl_opts = {
         **base_opts,
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",  # Fallback to best available format
+        "format": "bestvideo+bestaudio/best",  # Fallback to best available format
         "postprocessors": [{
             "key": "FFmpegVideoConvertor",
             "preferredformat": "mp4"
