@@ -102,7 +102,7 @@ def handle_download():
             return jsonify({"error": "Missing required fields"}), 400
 
         video_url = data["videoUrl"]
-        download_type = data["downloadType"]
+        download_type = data["downloadType"].strip().lower()
         logging.info(f"New download request: {video_url} [{download_type}]")
 
         # Load cookies if available
