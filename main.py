@@ -43,7 +43,7 @@ logging.basicConfig(
     ]
 )
 
-COOKIES_FILE = Path("cookies.txt")
+# COOKIES_FILE = Path("cookies.txt")
 
 def human_like_delay():
     time.sleep(random.choice([
@@ -82,6 +82,7 @@ def handle_download():
             "compat_opts": ["no-certifi"],
             "http_chunk_size": random.randint(1048576, 10485760),  # Random chunk size
             "ssl_ca_certificates": certifi.where(),
+            "cookies_from_browser": ("chrome","firefox",),  # Use Chrome cookies
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
                 "Accept-Language": "en-US,en;q=0.9",
@@ -105,14 +106,18 @@ def handle_download():
                 if not stream_url:
                     raise yt_dlp.utils.DownloadError("NOT direct stream URL found" + stream_url.get('url'))
 
-                print("Stream URL:", stream_url)
+                # Extract cookies
+                jar = ydl.cookiejar
+                cookies = jar._cookies  # Internal dictionary storing cookies                
+                print("\n[DEBUG] Extracted Cookies:")
+                # Iterate over cookies and print them
+                for domain, paths in cookies.items():
+                    for path, cookie_dict in paths.items():
+                        for name, cookie in cookie_dict.items():
+                            print(f"{name}: {cookie.value} (Domain: {domain}, Path: {path})")
 
                 # Prepare streaming headers
                 headers = {"User-Agent": base_ydl_opts["http_headers"]["User-Agent"]}
-                if COOKIES_FILE.exists():
-                    cj = MozillaCookieJar()
-                    cj.load(str(COOKIES_FILE), ignore_discard=True, ignore_expires=True)
-                    headers.update({"Cookie": "; ".join([f"{c.name}={c.value}" for c in cj])})
 
                 # Forward range headers for resumable downloads
                 if 'Range' in request.headers:
