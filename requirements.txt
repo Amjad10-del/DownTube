@@ -1,5 +1,5 @@
 Flask==3.0.2
-yt-dlp==2023.12.30  # Verified working version
+yt-dlp==2025.01.26  # Verified working version
 gunicorn==21.2.0
 gevent==23.9.1
 certifi==2024.2.2
