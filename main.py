@@ -147,7 +147,7 @@ def handle_video_download(url, base_opts):
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",  # Fallback to best available format
         "postprocessors": [{
             "key": "FFmpegVideoConvertor",
-            "preferedformat": "mp4"
+            "preferredformat": "mp4"
         }]
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
