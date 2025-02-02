@@ -12,26 +12,13 @@ os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 
 from flask import Flask, request, jsonify, Response, send_file
 import yt_dlp
-import ssl
-import random
-import time
 import tempfile
-import shutil
-import mimetypes
 import re
 import requests
 from pathlib import Path
 from urllib.parse import quote
 
 app = Flask(__name__, static_folder="./FrontEnd", static_url_path="/")
-
-# Critical SSL Configuration (MUST BE AT TOP)
-os.environ['SSL_CERT_FILE'] = certifi.where()
-os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
-
-# Log the paths to ensure they are set correctly
-logging.info(f"SSL_CERT_FILE: {os.environ['SSL_CERT_FILE']}")
-logging.info(f"REQUESTS_CA_BUNDLE: {os.environ['REQUESTS_CA_BUNDLE']}")
 
 # Configure logging with UTF-8 encoding
 logging.basicConfig(
@@ -43,15 +30,6 @@ logging.basicConfig(
     ]
 )
 
-COOKIES_FILE = Path("cookies.txt")
-
-def human_like_delay():
-    time.sleep(random.choice([
-        random.uniform(10, 30),  # Quick return
-        random.uniform(5, 25),  # Medium wait
-        random.uniform(25 ,50) # Long wait
-    ]))
-
 def sanitize_filename(filename: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", filename)
 
@@ -62,7 +40,6 @@ def serve_frontend():
 @app.route("/download", methods=["POST"])
 def handle_download():
     try:
-        human_like_delay()
         data = request.get_json()
 
         if not data or not all([data.get("videoUrl"), data.get("downloadType")]):
@@ -74,15 +51,6 @@ def handle_download():
 
         # Common YDL options
         base_ydl_opts = {
-            "nocheckcertificate": False,
-            "retries": 5,
-            "socket_timeout": 30,
-            "skip": ["authcheck"],  # Bypass bot checks
-            "force_ipv4": True,
-            "compat_opts": ["no-certifi"],
-            "http_chunk_size": random.randint(1048576, 10485760),  # Random chunk size
-            "ssl_ca_certificates": certifi.where(),
-            "cookies_from_browser": ("chrome","firefox",),  # Use Chrome cookies
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
                 "Accept-Language": "en-US,en;q=0.9",
@@ -95,7 +63,6 @@ def handle_download():
             ydl_opts = {
                 **base_ydl_opts,
                 "format": "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]/best",
-                # "download": False  # Don't download, just get metadata
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -106,24 +73,8 @@ def handle_download():
                 if not stream_url:
                     raise yt_dlp.utils.DownloadError("NOT direct stream URL found" + stream_url.get('url'))
 
-                # Extract cookies
-                jar = ydl.cookiejar
-                cookies = jar._cookies  # Internal dictionary storing cookies                
-                print("\n[DEBUG] Extracted Cookies:")
-                # Iterate over cookies and print them
-                for domain, paths in cookies.items():
-                    for path, cookie_dict in paths.items():
-                        for name, cookie in cookie_dict.items():
-                            print(f"{name}: {cookie.value} (Domain: {domain}, Path: {path})")
-
                 # Prepare streaming headers
                 headers = {"User-Agent": base_ydl_opts["http_headers"]["User-Agent"]}
-
-                print("\n[DEBUG] COOKIES_FILE: ", COOKIES_FILE)
-                if COOKIES_FILE.exists():
-                    cj = MozillaCookieJar()
-                    cj.load(str(COOKIES_FILE), ignore_discard=True, ignore_expires=True)
-                    headers.update({"Cookie": "; ".join([f"{c.name}={c.value}" for c in cj])})
 
                 # Forward range headers for resumable downloads
                 if 'Range' in request.headers:
